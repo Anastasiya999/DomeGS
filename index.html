@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DomeGS: Background Completion for 3DGS in VR</title>
+<meta name="description" content="DomeGS: Perceptually Consistent Background Completion for Unbounded 3D Gaussian Splatting in Virtual Reality.">
+<meta property="og:title" content="DomeGS: Perceptually Consistent Background Completion for Unbounded 3DGS in VR">
+<meta property="og:description" content="A Gaussian skydome that completes missing sky and horizon inside the 3DGS scene, improving presence and realism in VR (N=36 user study).">
+<meta property="og:image" content="https://anastasiya999.github.io/DomeGS/static/images/teaser.png">
+<meta property="og:url" content="https://anastasiya999.github.io/DomeGS/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#ffffff; --bg-alt:#f5f7fa; --surface:#ffffff; --text:#14181f; --muted:#5b6472; --border:#e3e7ee;
+  --accent:#1f6fd1; --accent-soft:#e6f0fc; --dome:#1f77b4; --sky:#e0712a; --equal:#9aa4b2;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 16px rgba(16,24,40,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1116; --bg-alt:#141922; --surface:#171c25; --text:#e8ecf2; --muted:#9aa4b2; --border:#262d39;
+    --accent:#5aa2ff; --accent-soft:#16253b; --dome:#4ea3e6; --sky:#f08a45; --equal:#6b7585;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1116; --bg-alt:#141922; --surface:#171c25; --text:#e8ecf2; --muted:#9aa4b2; --border:#262d39;
+  --accent:#5aa2ff; --accent-soft:#16253b; --dome:#4ea3e6; --sky:#f08a45; --equal:#6b7585;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 Inter,system-ui,-apple-system,Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
+img,video{max-width:100%;display:block}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+.narrow{max-width:820px}
+section{padding:56px 0}
+section.alt{background:var(--bg-alt)}
+h2{font-size:clamp(1.5rem,3vw,2rem);margin:0 0 8px;letter-spacing:-.02em;text-align:center}
+h3{font-size:1.15rem;margin:0 0 6px}
+.lead{color:var(--muted);text-align:center;max-width:720px;margin:0 auto 32px}
+.caption{color:var(--muted);font-size:.9rem;margin-top:10px}
+
+/* nav */
+nav.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+nav.top .wrap{display:flex;align-items:center;gap:20px;height:52px;overflow-x:auto;scrollbar-width:none}
+nav.top .brand{font-weight:800;color:var(--text);margin-right:auto;white-space:nowrap}
+nav.top a.l{color:var(--muted);font-size:.9rem;white-space:nowrap}
+nav.top a.l:hover{color:var(--text);text-decoration:none}
+#themeBtn{background:none;border:1px solid var(--border);color:var(--text);border-radius:8px;width:32px;height:32px;cursor:pointer;flex:none}
+
+/* hero */
+header.hero{padding:56px 0 24px;text-align:center}
+.venue{display:inline-block;font-size:.8rem;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:4px 12px;border-radius:999px;margin-bottom:18px}
+h1{font-size:clamp(1.8rem,4.6vw,3.1rem);line-height:1.15;letter-spacing:-.03em;margin:0 auto 22px;max-width:980px}
+h1 .name{background:linear-gradient(90deg,#1f6fd1,#38a3e8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.authors{font-size:1.05rem;max-width:900px;margin:0 auto 8px}
+.authors span{white-space:nowrap;margin:0 8px}
+.authors sup,.affils sup{color:var(--muted)}
+.affils{color:var(--muted);font-size:.92rem;margin-bottom:26px}
+.affils span{margin:0 10px;white-space:nowrap}
+.btns{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:999px;background:var(--text);color:var(--bg);font-weight:600;font-size:.95rem}
+.btn:hover{text-decoration:none;opacity:.88}
+.btn svg{width:18px;height:18px}
+
+.media{border-radius:14px;overflow:hidden;box-shadow:var(--shadow);background:#000}
+.tldr{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:12px;padding:16px 20px;margin-top:28px;box-shadow:var(--shadow)}
+.tldr b{color:var(--accent)}
+
+/* abstract */
+.abstract p{text-align:justify;hyphens:auto}
+
+/* method */
+.figure-card{background:#fff;border-radius:14px;padding:12px;border:1px solid var(--border);box-shadow:var(--shadow)}
+.stages{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
+.stage{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
+.stage .num{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:.85rem;margin-bottom:8px}
+.stage p{margin:0;color:var(--muted);font-size:.93rem}
+
+/* tabs */
+.tabs{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.tab{border:1px solid var(--border);background:var(--surface);color:var(--text);padding:8px 16px;border-radius:999px;cursor:pointer;font:inherit;font-size:.92rem;font-weight:500}
+.tab small{color:var(--muted);font-weight:400;margin-left:4px}
+.tab[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tab[aria-selected="true"] small{color:inherit;opacity:.7}
+
+/* single A/B player */
+.player{position:relative;aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;max-width:720px;margin:0 auto}
+.player video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:opacity .18s ease}
+.player[data-show="A"] #vB,.player[data-show="B"] #vA{opacity:0}
+.player::after{content:"";position:absolute;inset:0;border:4px solid var(--dome);border-radius:14px;pointer-events:none;transition:border-color .18s}
+.player[data-show="A"]::after{border-color:var(--sky)}
+.seg{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);border-radius:999px;padding:4px;gap:4px}
+.seg button{border:none;background:transparent;color:#fff;font:inherit;font-size:.85rem;font-weight:600;padding:6px 14px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.seg button[aria-checked="true"].sky{background:var(--sky)}
+.seg button[aria-checked="true"].dome{background:var(--dome)}
+.player + .controls{max-width:720px;margin-left:auto;margin-right:auto}
+.auto{display:flex;align-items:center;gap:5px;font-size:.85rem;color:var(--muted);cursor:pointer;white-space:nowrap}
+.auto input{accent-color:var(--accent)}
+kbd{font-family:"JetBrains Mono",monospace;font-size:.78rem;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--surface)}
+.controls{display:flex;align-items:center;gap:12px;margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:8px 14px}
+.controls button{border:none;background:var(--text);color:var(--bg);width:36px;height:36px;border-radius:50%;cursor:pointer;display:grid;place-items:center;flex:none}
+.controls input[type=range]{flex:1;accent-color:var(--accent);min-width:60px}
+.controls select{font:inherit;font-size:.85rem;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:3px 6px}
+.controls .t{font-family:"JetBrains Mono",monospace;font-size:.8rem;color:var(--muted);white-space:nowrap}
+.note{font-size:.85rem;color:var(--muted);text-align:center;margin:10px auto 0;max-width:720px}
+
+/* 360 viewer */
+.pano{position:relative;max-width:900px;margin:0 auto;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000;box-shadow:var(--shadow);touch-action:none;cursor:grab;user-select:none}
+.pano.dragging{cursor:grabbing}
+.pano canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.pano-split{position:absolute;top:0;bottom:0;left:50%;width:3px;background:#fff;transform:translateX(-50%);box-shadow:0 0 6px rgba(0,0,0,.5);cursor:ew-resize}
+.pano-split::before{content:"";position:absolute;inset:0 -14px}
+.pano-split .knob{position:absolute;top:50%;left:50%;width:40px;height:40px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.35);color:#333;font-size:14px;font-weight:700}
+.pano[data-mode="before"] .pano-split,.pano[data-mode="after"] .pano-split{display:none}
+.pano[data-mode="before"] .lab.r,.pano[data-mode="after"] .lab.l{display:none}
+.pano .lab{position:absolute;bottom:12px;font-size:.78rem;font-weight:700;color:#fff;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.55);pointer-events:none}
+.pano .lab.l{left:12px}.pano .lab.r{right:12px}
+.pano-seg{top:12px}
+.seg button[aria-checked="true"].neutral{background:rgba(255,255,255,.9);color:#111}
+.pano-loading{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:.9rem;background:rgba(0,0,0,.4);pointer-events:none;transition:opacity .3s}
+.pano-loading.done{opacity:0}
+.pano-hint{position:absolute;bottom:48px;left:50%;transform:translateX(-50%);color:#fff;font-size:.8rem;background:rgba(0,0,0,.55);padding:4px 12px;border-radius:999px;pointer-events:none;transition:opacity .5s}
+.pano-hint.gone{opacity:0}
+
+/* wipe slider */
+.wipe{position:relative;border-radius:12px;overflow:hidden;user-select:none;touch-action:none;cursor:ew-resize;box-shadow:var(--shadow);aspect-ratio:1496/294}
+.wipe img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.wipe .top{clip-path:inset(0 50% 0 0)}
+.wipe .bar{position:absolute;top:0;bottom:0;left:50%;width:3px;background:#fff;transform:translateX(-50%);box-shadow:0 0 6px rgba(0,0,0,.5)}
+.wipe .knob{position:absolute;top:50%;left:50%;width:40px;height:40px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.35);color:#333;font-size:14px;font-weight:700}
+.wipe .lab{position:absolute;bottom:10px;font-size:.78rem;font-weight:700;color:#fff;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.55)}
+.wipe .lab.l{left:10px}.wipe .lab.r{right:10px}
+.wipe-pick{display:flex;justify-content:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;font-size:.9rem;color:var(--muted)}
+
+/* results */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:36px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
+.stat .v{font-size:1.9rem;font-weight:800;letter-spacing:-.02em;color:var(--accent);line-height:1.1}
+.stat .k{font-weight:600;margin-top:4px}
+.stat .d{color:var(--muted);font-size:.83rem;margin-top:2px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;box-shadow:var(--shadow);margin-bottom:22px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.85rem;color:var(--muted);margin-bottom:14px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.pref-row{display:grid;grid-template-columns:150px 1fr 90px;gap:12px;align-items:center;margin:10px 0}
+.pref-row .lbl{font-size:.92rem;font-weight:500}
+.pref-row .sig{font-size:.8rem;color:var(--muted);font-family:"JetBrains Mono",monospace}
+.pbar{display:flex;height:30px;border-radius:7px;overflow:hidden}
+.pbar div{display:grid;place-items:center;color:#fff;font-size:.78rem;font-weight:600;width:0;transition:width .9s cubic-bezier(.2,.8,.2,1);overflow:hidden;white-space:nowrap}
+.pbar .d{background:var(--dome)} .pbar .e{background:var(--equal)} .pbar .s{background:var(--sky)}
+.vlm{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.metric h4{margin:0 0 10px;font-size:.92rem}
+.hb{display:grid;grid-template-columns:62px 1fr 38px;gap:8px;align-items:center;font-size:.82rem;margin:6px 0}
+.hb .track{height:14px;background:var(--bg-alt);border-radius:4px;overflow:hidden}
+.hb .fill{height:100%;border-radius:4px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.hb .num{font-family:"JetBrains Mono",monospace;color:var(--muted);text-align:right}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.imgcard{background:#fff;border:1px solid var(--border);border-radius:14px;padding:10px;box-shadow:var(--shadow)}
+.imgcard img{border-radius:8px;cursor:zoom-in}
+
+/* bibtex */
+.bib{position:relative}
+.bib pre{background:var(--bg-alt);border:1px solid var(--border);border-radius:12px;padding:18px;overflow-x:auto;font:13px/1.6 "JetBrains Mono",monospace;margin:0}
+.bib button{position:absolute;top:10px;right:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:5px 12px;cursor:pointer;font:inherit;font-size:.82rem}
+
+footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font-size:.85rem;text-align:center}
+
+/* lightbox */
+#lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;place-items:center;z-index:50;padding:16px;cursor:zoom-out}
+#lb.on{display:grid}
+#lb img{max-width:96vw;max-height:92vh;background:#fff;border-radius:8px}
+
+@media (max-width:820px){
+  .stages,.two{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr}
+  .vlm{grid-template-columns:1fr}
+  .pref-row{grid-template-columns:1fr;gap:4px}
+  nav.top a.l.hide-sm{display:none}
+}
+@media (max-width:560px){
+  .seg button{font-size:.75rem;padding:5px 10px}
+  section{padding:40px 0}
+  .authors span{white-space:normal;display:inline-block}
+}
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap">
+    <a class="brand" href="#">DomeGS</a>
+    <a class="l" href="#method">Method</a>
+    <a class="l" href="#panorama">360°</a>
+    <a class="l" href="#compare">Comparison</a>
+    <a class="l" href="#results">Results</a>
+    <a class="l hide-sm" href="#bibtex">BibTeX</a>
+    <button id="themeBtn" aria-label="Toggle dark mode" title="Toggle theme">◐</button>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="venue">arXiv 2026 · cs.GR</span>
+    <h1><span class="name">DomeGS</span>: Perceptually Consistent Background Completion for Unbounded 3D Gaussian Splatting in Virtual Reality</h1>
+    <div class="authors">
+      <span>Anastasiya Pechko<sup>1</sup></span>
+      <span>Agata Szymańska<sup>1</sup></span>
+      <span>Piotr Borycki<sup>1,2</sup></span>
+      <span>Joanna Szelewska<sup>1,2</sup></span>
+      <span>Michał Mnich<sup>1</sup></span>
+      <span>Slawomir Konrad Tadeja<sup>3</sup></span>
+      <span>Przemysław Spurek<sup>1,2</sup></span>
+    </div>
+    <div class="affils">
+      <span><sup>1</sup>Jagiellonian University</span>
+      <span><sup>2</sup>IDEAS Research Institute</span>
+      <span><sup>3</sup>University of Cambridge</span>
+    </div>
+    <div class="btns">
+      <a class="btn" href="https://arxiv.org/pdf/2610.37172" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Paper</a>
+      <a class="btn" href="https://arxiv.org/abs/2610.37172" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l16 16M20 4L4 20"/></svg>arXiv</a>
+      <a class="btn" href="https://github.com/Anastasiya999/DomeGS" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 8.4 22.9c.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A11.5 11.5 0 0 0 12 .5z"/></svg>Code</a>
+      <a class="btn" href="#compare">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Comparison</a>
+    </div>
+  </div>
+</header>
+
+<section id="teaser" style="padding-top:24px">
+  <div class="wrap">
+    <div class="figure-card"><img src="static/images/teaser.png" alt="DomeGS pipeline: panorama outpainting, scene-adaptive dataset preparation, unified sky Gaussian optimization" data-zoom></div>
+    <p class="caption" style="text-align:center">DomeGS fills the missing background of a 3DGS scene. It outpaints a 360° panorama, adds training views that cover the new background, and fine-tunes the scene on both the original and the added views. Click to enlarge.</p>
+    <div class="tldr">
+      <div><b>TL;DR</b> When you reconstruct an outdoor scene with 3D Gaussian Splatting, the sky and horizon often come out missing or full of artifacts. A skybox can fill the gap, but it never quite matches the scene. <b>DomeGS</b> outpaints a 360° panorama of the missing background and bakes it into the scene as a <em>Gaussian skydome</em>. The result is one unified 3DGS asset that keeps parallax and lighting consistent. In a VR study with 36 participants, it significantly increased spatial presence and realism.</div>
+    </div>
+  </div>
+</section>
+
+<section class="alt abstract">
+  <div class="wrap narrow">
+    <h2>Abstract</h2>
+    <p>The growing need for high-quality 3D content remains among the most prevalent challenges in virtual reality (VR). Recently, novel view synthesis techniques have enabled rapid content creation, with 3D Gaussian Splatting (3DGS) emerging as one of the most promising methods for generating high-fidelity 3D scenes. However, using 3DGS to reconstruct unbounded outdoor scenes can leave horizons incomplete due to missing data or a lack of distant geometric constraints. Such incompleteness can break immersion, compromising VR’s core characteristic. A typical workaround in traditional VR systems is a textured cube (skybox) or sphere (skydome) surrounding the environment to create the illusion of a distant background. However, these approaches struggle to blend seamlessly with the reconstructed 3DGS geometry. To address these issues, we introduce the DomeGS framework, which incorporates the skydome concept not as a flat background shell, but as a part of the reconstructed Gaussian Splatting 3D scene. By integrating the horizon and sky into the 3DGS representation, our method provides a unified, scene-consistent environment bridging foregrounds and backgrounds for greater realism. Experimental evaluation with N=36 users demonstrates that DomeGS significantly increases spatial presence (p=0.042) and realism (p=0.042) compared to the skybox baseline.</p>
+  </div>
+</section>
+
+<section id="method">
+  <div class="wrap">
+    <h2>Method</h2>
+    <p class="lead">Rather than compositing a flat 2D backdrop, DomeGS adds the far field to the Gaussian representation itself, so the near-field scene and the sky respond together as the user moves.</p>
+    <div class="stages">
+      <div class="stage"><span class="num">I</span><h3>Panorama Outpainting</h3><p>We render a partial 360° panorama from the reconstructed scene, then fill the missing sky and horizon with a 360°-aware generative model (FLUX.2-klein + ERP LoRA).</p></div>
+      <div class="stage"><span class="num">II</span><h3>Scene-Adaptive Dataset Preparation</h3><p>We estimate the shell radius and optimal base pitch, use “look-back” probe cameras to remove backside floaters, and render new upward, horizontal and downward training views.</p></div>
+      <div class="stage"><span class="num">III</span><h3>Unified Sky Gaussian Optimization</h3><p>We seed new Gaussians on a finite-radius sphere and fine-tune them together with the cleaned scene on both the original and the added views. The output is a single 3DGS asset.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="panorama">
+  <div class="wrap">
+    <h2>Explore in 360°</h2>
+    <p class="lead">Panoramas rendered from the reconstructed scene, before and after DomeGS completes the background. Drag to look around, scroll or pinch to zoom, and move the white divider to compare.</p>
+    <div class="tabs" role="tablist" id="panoTabs">
+      <button class="tab" role="tab" aria-selected="true" data-pano="garden">Garden <small>close-range</small></button>
+      <button class="tab" role="tab" aria-selected="false" data-pano="bear">Bear <small>close-range</small></button>
+      <button class="tab" role="tab" aria-selected="false" data-pano="buddha">Buddha <small>panoramic</small></button>
+      <button class="tab" role="tab" aria-selected="false" data-pano="tower">Tower <small>panoramic</small></button>
+    </div>
+    <div class="pano" id="pano">
+      <canvas id="panoCanvas"></canvas>
+      <div class="pano-split" id="panoSplit"><div class="knob">⇆</div></div>
+      <span class="lab l" id="panoLabL">Before · raw 3DGS</span>
+      <span class="lab r" id="panoLabR">After · DomeGS</span>
+      <div class="seg pano-seg" role="radiogroup" aria-label="View mode">
+        <button data-mode="before" class="sky" role="radio" aria-checked="false">Before</button>
+        <button data-mode="split" class="neutral" role="radio" aria-checked="true">Split</button>
+        <button data-mode="after" class="dome" role="radio" aria-checked="false">After</button>
+      </div>
+      <div class="pano-loading" id="panoLoading">Loading panorama…</div>
+      <div class="pano-hint" id="panoHint">Drag to look around</div>
+    </div>
+    <p class="note">Black regions in the “before” panoramas are parts of the sphere that the original capture never saw. The 360°-aware outpainting fills them, and DomeGS then bakes the result into the scene as Gaussians.</p>
+  </div>
+</section>
+
+<section id="compare" class="alt">
+  <div class="wrap">
+    <h2>Skybox vs. DomeGS in VR</h2>
+    <p class="lead">VR captures from the user study. A skybox stays fixed at infinity, so it slides against the foreground as you move, and its seams and color shifts show. The DomeGS sky is part of the scene and keeps realistic parallax.</p>
+    <div class="tabs" role="tablist" id="sceneTabs">
+      <button class="tab" role="tab" aria-selected="true" data-scene="garden">Garden <small>close-range</small></button>
+      <button class="tab" role="tab" aria-selected="false" data-scene="buddha">Buddha <small>panoramic</small></button>
+    </div>
+    <div class="player" id="player" data-show="B" title="Click to switch">
+      <video id="vA" muted playsinline loop preload="auto"></video>
+      <video id="vB" muted playsinline loop preload="auto"></video>
+      <div class="seg" role="radiogroup" aria-label="Rendering method">
+        <button data-show="A" class="sky" role="radio" aria-checked="false">Skybox (baseline)</button>
+        <button data-show="B" class="dome" role="radio" aria-checked="true">DomeGS (ours)</button>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="playBtn" aria-label="Play / pause"><svg id="playIco" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+      <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek both videos">
+      <span class="t" id="tlabel">0%</span>
+      <select id="speed" aria-label="Playback speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option></select>
+      <label class="auto"><input type="checkbox" id="autoFlip"> Auto</label>
+    </div>
+    <p class="note">Click the video, or press <kbd>←</kbd> / <kbd>→</kbd>, to switch between Skybox and DomeGS at the same point in the walkthrough. <em>Auto</em> switches between them every 2 s. The clips are separate headset recordings, so the viewpoints match closely but not frame for frame.</p>
+
+    <h3 style="text-align:center;margin-top:48px">Drag to compare: Tower panorama</h3>
+    <p class="lead" style="margin-bottom:16px">The same equirectangular view rendered three ways. Drag the handle across.</p>
+    <div class="wipe-pick">
+      Left:
+      <button class="tab" data-left="raw" aria-selected="false">Raw 3DGS</button>
+      <button class="tab" data-left="skybox" aria-selected="true">Skybox (HDR)</button>
+      <span style="margin-left:6px">Right: <b style="color:var(--dome)">DomeGS</b></span>
+    </div>
+    <div class="wipe" id="wipe">
+      <img src="static/images/tower_domegs.jpg" alt="DomeGS rendering of the Tower scene">
+      <img class="top" id="wipeTop" src="static/images/tower_skybox.jpg" alt="Baseline rendering of the Tower scene">
+      <div class="bar"></div><div class="knob">⇆</div>
+      <span class="lab l" id="wipeLab">Skybox · seams &amp; mismatch</span><span class="lab r">DomeGS · artifact-free</span>
+    </div>
+
+    <div style="margin:48px auto 0;max-width:720px">
+      <div>
+        <h3 style="text-align:center">Parallax under forward motion</h3>
+        <div class="imgcard"><img src="static/images/fig6_parallax.jpg" alt="Parallax comparison for Garden and Bear scenes" data-zoom loading="lazy"></div>
+        <p class="caption">DomeGS (left) vs. Skybox (right), before and after the user moves. In <b>Garden</b>, the static skybox drifts out of alignment with the foreground. In <b>Bear</b>, the skybox tree doesn't grow as the user gets closer. Click to enlarge.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <h2>User Study</h2>
+    <p class="lead">A within-subjects VR study with 36 participants. Each person saw 4 scenes × 2 conditions and did a bird-search task while giving in-task ratings, then filled in IPQ, NASA-TLX and SSQ questionnaires.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="v">+1.24</div><div class="k">Background consistency</div><div class="d">Δ on −3…+3 scale, d = 0.85, p &lt; .001</div></div>
+      <div class="stat"><div class="v">+0.44</div><div class="k">Perceived immersion</div><div class="d">Δ on −3…+3 scale, d = 0.35, p &lt; .001</div></div>
+      <div class="stat"><div class="v">p = .042</div><div class="k">Spatial presence &amp; realism</div><div class="d">IPQ subscales, Holm-adjusted</div></div>
+      <div class="stat"><div class="v">75%</div><div class="k">Prefer DomeGS</div><div class="d">for a longer VR visit (vs. 8% Skybox)</div></div>
+    </div>
+
+    <div class="panel" id="prefPanel">
+      <h3>End-of-session preferences</h3>
+      <div class="legend"><span><i style="background:var(--dome)"></i>DomeGS</span><span><i style="background:var(--equal)"></i>Equal</span><span><i style="background:var(--sky)"></i>Skybox</span></div>
+      <div id="prefRows"></div>
+      <p class="caption">Holm-adjusted two-tailed exact binomial tests, N = 36.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Automated quality check with a vision-language model</h3>
+      <p class="caption" style="margin:0 0 14px">Qwen3-VL-32B rated rendered views from 1 to 5. Pick a scene:</p>
+      <div class="tabs" id="vlmTabs" style="justify-content:flex-start"></div>
+      <div class="legend"><span><i style="background:var(--dome)"></i>DomeGS</span><span><i style="background:var(--sky)"></i>Skybox</span><span id="vlmPref" style="margin-left:auto;font-weight:600;color:var(--text)"></span></div>
+      <div class="vlm" id="vlmBars"></div>
+    </div>
+
+    <div class="two">
+      <div>
+        <h3>Presence (IPQ)</h3>
+        <div class="imgcard"><img src="static/images/fig9_ipq.png" alt="IPQ presence subscale box plots" data-zoom loading="lazy"></div>
+        <p class="caption">Spatial presence and experienced realism are significantly higher with DomeGS. General presence, involvement and the total score do not differ significantly.</p>
+      </div>
+      <div>
+        <h3>No extra cost to comfort or effort</h3>
+        <div class="imgcard"><img src="static/images/fig5_task.png" alt="Bird search task design" data-zoom loading="lazy"></div>
+        <p class="caption">Bird-search task design. Search time and head-path length were comparable, NASA-TLX workload was equivalent (TOST), and simulator sickness stayed mild and did not differ between conditions (SSQ total 16.5 vs. 17.9).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="bibtex" class="alt">
+  <div class="wrap narrow">
+    <h2>BibTeX</h2>
+    <div class="bib" style="margin-top:20px">
+      <button id="copyBib">Copy</button>
+<pre id="bibText">@article{pechko2026domegs,
+  title   = {DomeGS: Perceptually Consistent Background Completion for
+             Unbounded 3D Gaussian Splatting in Virtual Reality},
+  author  = {Pechko, Anastasiya and Szyma{\'n}ska, Agata and Borycki, Piotr and
+             Szelewska, Joanna and Mnich, Micha{\l} and Tadeja, Slawomir Konrad and
+             Spurek, Przemys{\l}aw},
+  journal = {arXiv preprint arXiv:2610.37172},
+  year    = {2026}
+}</pre>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap narrow">
+    <h3>Acknowledgments</h3>
+    <p class="caption" style="margin-top:0">The work of P. Spurek and A. Pechko was supported by the project “Effective rendering of 3D objects using Gaussian Splatting in an Augmented Reality environment” (FENG.02.02-IP.05-0114/23), carried out within the First Team programme of the Foundation for Polish Science and co-financed by the European Union under the European Funds for Smart Economy 2021–2027 (FENG). The work of P. Borycki was supported by the National Centre of Science (Poland), Grant No. 2025/57/N/ST6/04389. The work of J. Szelewska was supported by the National Centre of Science (Poland), Grant No. 2025/57/N/ST6/04390.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">© 2026 The DomeGS authors · <a href="https://github.com/Anastasiya999/DomeGS">Code on GitHub</a></div>
+</footer>
+
+<div id="lb" aria-hidden="true"><img alt=""></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* 360° before/after panorama viewer */
+(function(){
+  var box=document.getElementById('pano'), canvas=document.getElementById('panoCanvas');
+  var splitEl=document.getElementById('panoSplit'), loading=document.getElementById('panoLoading'), hint=document.getElementById('panoHint');
+  if(!window.THREE){loading.textContent='360° viewer could not load.'; return;}
+  var renderer;
+  try{renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});}catch(e){loading.textContent='WebGL is not available in this browser.'; return;}
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  var scene=new THREE.Scene(), camera=new THREE.PerspectiveCamera(90,16/9,1,1100);
+  var geo=new THREE.SphereGeometry(500,96,48); geo.scale(-1,1,1);
+  var blank=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1,THREE.RGBAFormat); blank.needsUpdate=true;
+  var mat=new THREE.ShaderMaterial({
+    uniforms:{tA:{value:blank},tB:{value:blank},split:{value:.5},width:{value:1}},
+    vertexShader:'varying vec2 vUv; void main(){vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader:'uniform sampler2D tA; uniform sampler2D tB; uniform float split; uniform float width; varying vec2 vUv;'+
+      'void main(){ float x=gl_FragCoord.x/width; gl_FragColor = x<split ? texture2D(tA,vUv) : texture2D(tB,vUv); }'
+  });
+  scene.add(new THREE.Mesh(geo,mat));
+
+  var lon=0, lat=5, fov=90, mode='split', splitPos=.5, interacted=false, needs=true, visible=false;
+  var loader=new THREE.TextureLoader(), cache={}, current=null;
+
+  function tex(url){
+    if(!cache[url]) cache[url]=new Promise(function(res,rej){
+      loader.load(url,function(t){t.minFilter=THREE.LinearFilter; t.generateMipmaps=false; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); res(t);},undefined,rej);
+    });
+    return cache[url];
+  }
+  function load(name){
+    current=name; loading.classList.remove('done'); loading.textContent='Loading panorama…';
+    Promise.all([tex('static/panoramas/'+name+'_before.jpg'),tex('static/panoramas/'+name+'_after.jpg')]).then(function(t){
+      if(current!==name) return;
+      mat.uniforms.tA.value=t[0]; mat.uniforms.tB.value=t[1]; loading.classList.add('done'); needs=true;
+    },function(){
+      loading.textContent = location.protocol==='file:'
+        ? 'The 360° viewer needs the page to be served over http (for example GitHub Pages or a local server). Browsers block it when index.html is opened directly as a file.'
+        : 'Could not load panorama.';
+      loading.style.padding='0 24px'; loading.style.textAlign='center';
+    });
+  }
+  function resize(){
+    var r=box.getBoundingClientRect(); if(!r.width) return;
+    renderer.setSize(r.width,r.height,false); camera.aspect=r.width/r.height; camera.updateProjectionMatrix();
+    mat.uniforms.width.value=renderer.getDrawingBufferSize(new THREE.Vector2()).x; needs=true;
+  }
+  function applySplit(){
+    mat.uniforms.split.value = mode==='before'?1 : mode==='after'?0 : splitPos;
+    splitEl.style.left=(splitPos*100)+'%'; needs=true;
+  }
+  function frame(){
+    requestAnimationFrame(frame);
+    if(!visible) return;
+    if(!interacted){lon+=0.04; needs=true;}
+    if(!needs) return; needs=false;
+    lat=Math.max(-85,Math.min(85,lat));
+    var phi=THREE.MathUtils.degToRad(90-lat), th=THREE.MathUtils.degToRad(lon);
+    camera.fov=fov; camera.updateProjectionMatrix();
+    camera.lookAt(500*Math.sin(phi)*Math.cos(th),500*Math.cos(phi),500*Math.sin(phi)*Math.sin(th));
+    renderer.render(scene,camera);
+  }
+
+  /* look-around + pinch zoom */
+  var pts={}, last=null, pinch0=null;
+  function stopAuto(){ if(!interacted){interacted=true; hint.classList.add('gone');} }
+  box.addEventListener('pointerdown',function(e){
+    if(e.target.closest('.seg,.pano-split')) return;
+    box.setPointerCapture(e.pointerId); pts[e.pointerId]={x:e.clientX,y:e.clientY};
+    last={x:e.clientX,y:e.clientY}; box.classList.add('dragging'); stopAuto();
+  });
+  box.addEventListener('pointermove',function(e){
+    if(!pts[e.pointerId]) return;
+    pts[e.pointerId]={x:e.clientX,y:e.clientY};
+    var ids=Object.keys(pts);
+    if(ids.length===2){
+      var a=pts[ids[0]], b=pts[ids[1]], d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(pinch0) fov=Math.max(45,Math.min(100,fov*pinch0/d)); pinch0=d; needs=true; return;
+    }
+    var k=fov/box.clientHeight;
+    lon-= (e.clientX-last.x)*k; lat+= (e.clientY-last.y)*k;
+    last={x:e.clientX,y:e.clientY}; needs=true;
+  });
+  function up(e){delete pts[e.pointerId]; pinch0=null; if(!Object.keys(pts).length) box.classList.remove('dragging'); else {var p=pts[Object.keys(pts)[0]]; last={x:p.x,y:p.y};}}
+  box.addEventListener('pointerup',up); box.addEventListener('pointercancel',up);
+  box.addEventListener('wheel',function(e){e.preventDefault(); stopAuto(); fov=Math.max(45,Math.min(100,fov+e.deltaY*0.05)); needs=true;},{passive:false});
+
+  /* split divider */
+  var sdrag=false;
+  splitEl.addEventListener('pointerdown',function(e){e.stopPropagation(); sdrag=true; splitEl.setPointerCapture(e.pointerId);});
+  splitEl.addEventListener('pointermove',function(e){
+    if(!sdrag) return; var r=box.getBoundingClientRect();
+    splitPos=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)); applySplit();
+  });
+  splitEl.addEventListener('pointerup',function(){sdrag=false;});
+
+  /* mode + scene buttons */
+  var modeBtns=box.querySelectorAll('.pano-seg button');
+  modeBtns.forEach(function(b){
+    b.addEventListener('click',function(){
+      mode=b.dataset.mode; box.dataset.mode=mode;
+      modeBtns.forEach(function(x){x.setAttribute('aria-checked',x===b);}); applySplit();
+    });
+  });
+  document.querySelectorAll('#panoTabs .tab').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('#panoTabs .tab').forEach(function(x){x.setAttribute('aria-selected',x===b);});
+      load(b.dataset.pano);
+    });
+  });
+
+  box.dataset.mode=mode;
+  window.addEventListener('resize',resize);
+  if('ResizeObserver' in window) new ResizeObserver(resize).observe(box);
+  var started=false;
+  function start(){ if(started) return; started=true; resize(); applySplit(); load('garden'); }
+  if('IntersectionObserver' in window){
+    new IntersectionObserver(function(es){ visible=es[0].isIntersecting; if(visible){start(); needs=true;} },{rootMargin:'200px'}).observe(box);
+  } else {visible=true; start();}
+  requestAnimationFrame(frame);
+  window.__pano={get state(){return {lon:lon,lat:lat,fov:fov,mode:mode,split:mat.uniforms.split.value,width:mat.uniforms.width.value,current:current,loaded:mat.uniforms.tA.value!==blank};}};
+})();
+</script>
+
+<script>
+(function(){
+  /* theme */
+  var root=document.documentElement, KEY='domegs-theme';
+  try{var saved=localStorage.getItem(KEY); if(saved) root.setAttribute('data-theme',saved);}catch(e){}
+  document.getElementById('themeBtn').addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+    var next=cur==='dark'?'light':'dark'; root.setAttribute('data-theme',next);
+    try{localStorage.setItem(KEY,next);}catch(e){}
+  });
+
+  /* synced comparison videos */
+  var vA=document.getElementById('vA'), vB=document.getElementById('vB');
+  var playBtn=document.getElementById('playBtn'), ico=document.getElementById('playIco');
+  var seek=document.getElementById('seek'), tl=document.getElementById('tlabel'), speed=document.getElementById('speed');
+  var PLAY='<path d="M8 5v14l11-7z"/>', PAUSE='<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+  var playing=false, seeking=false;
+  function setIcon(){ico.innerHTML=playing?PAUSE:PLAY;}
+  function loadScene(s){
+    [['vA','skybox'],['vB','domeGS']].forEach(function(p){
+      var v=document.getElementById(p[0]);
+      v.src='static/videos/'+s+'_'+p[1]+'.mp4'; v.poster='static/images/'+s+'_'+p[1]+'_poster.jpg';
+      v.playbackRate=+speed.value; v.load();
+    });
+    seek.value=0; tl.textContent='0%';
+    if(playing) playCur();
+  }
+  function frac(v){return v.duration?v.currentTime/v.duration:0;}
+  /* only the visible clip plays; the other is parked at the same relative position */
+  function cur(){return document.getElementById('player').dataset.show==='A'?vA:vB;}
+  function other(){return cur()===vA?vB:vA;}
+  function playCur(){cur().play().catch(function(){playing=false;setIcon();}); other().pause();}
+  playBtn.addEventListener('click',function(){
+    playing=!playing; setIcon();
+    if(playing) playCur(); else {vA.pause(); vB.pause();}
+  });
+  [vA,vB].forEach(function(v){
+    v.addEventListener('timeupdate',function(){
+      if(seeking || v!==cur()) return;
+      var f=frac(v); seek.value=Math.round(f*1000); tl.textContent=Math.round(f*100)+'%';
+    });
+  });
+  seek.addEventListener('input',function(){
+    seeking=true; var f=seek.value/1000;
+    if(vA.duration) vA.currentTime=f*vA.duration;
+    if(vB.duration) vB.currentTime=f*vB.duration;
+    tl.textContent=Math.round(f*100)+'%';
+  });
+  seek.addEventListener('change',function(){seeking=false;});
+  speed.addEventListener('change',function(){vA.playbackRate=vB.playbackRate=+speed.value;});
+  document.querySelectorAll('#sceneTabs .tab').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('#sceneTabs .tab').forEach(function(x){x.setAttribute('aria-selected',x===b);});
+      loadScene(b.dataset.scene);
+    });
+  });
+  loadScene('garden');
+  /* autoplay comparison when it scrolls into view */
+  if('IntersectionObserver' in window){
+    var started=false;
+    new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(e.isIntersecting && !started){started=true; playing=true; setIcon(); playCur();}
+        else if(!e.isIntersecting && playing){vA.pause(); vB.pause(); playing=false; setIcon(); started=false;}
+      });
+    },{threshold:.4}).observe(document.getElementById('player'));
+  }
+
+  /* A/B switching in a single player */
+  var player=document.getElementById('player'), segBtns=player.querySelectorAll('.seg button');
+  var autoBox=document.getElementById('autoFlip'), autoTimer=null;
+  function show(which){
+    var from=cur(), to=which==='A'?vA:vB;
+    if(from!==to && from.duration && to.duration) to.currentTime=frac(from)*to.duration;
+    to.playbackRate=+speed.value;
+    player.dataset.show=which;
+    if(playing) playCur();
+    segBtns.forEach(function(b){b.setAttribute('aria-checked',b.dataset.show===which);});
+  }
+  function toggle(){show(player.dataset.show==='A'?'B':'A');}
+  segBtns.forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation(); show(b.dataset.show);});});
+  player.addEventListener('click',toggle);
+  document.addEventListener('keydown',function(e){
+    if(e.target.closest('input,select,textarea')) return;
+    var r=player.getBoundingClientRect(); if(r.bottom<0||r.top>innerHeight) return;
+    if(e.key==='ArrowLeft'){show('A'); e.preventDefault();}
+    if(e.key==='ArrowRight'){show('B'); e.preventDefault();}
+  });
+  autoBox.addEventListener('change',function(){
+    clearInterval(autoTimer); if(autoBox.checked) autoTimer=setInterval(toggle,2000);
+  });
+
+  /* wipe slider */
+  var wipe=document.getElementById('wipe'), top=document.getElementById('wipeTop');
+  var bar=wipe.querySelector('.bar'), knob=wipe.querySelector('.knob'), wl=document.getElementById('wipeLab');
+  function setWipe(p){p=Math.max(0,Math.min(100,p)); top.style.clipPath='inset(0 '+(100-p)+'% 0 0)'; bar.style.left=knob.style.left=p+'%';}
+  function fromEvt(e){var r=wipe.getBoundingClientRect(); setWipe((e.clientX-r.left)/r.width*100);}
+  var drag=false;
+  wipe.addEventListener('pointerdown',function(e){drag=true; wipe.setPointerCapture(e.pointerId); fromEvt(e);});
+  wipe.addEventListener('pointermove',function(e){if(drag) fromEvt(e);});
+  wipe.addEventListener('pointerup',function(){drag=false;});
+  var LABELS={raw:'Raw 3DGS · sky voids & floaters',skybox:'Skybox · seams & mismatch'};
+  document.querySelectorAll('[data-left]').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('[data-left]').forEach(function(x){x.setAttribute('aria-selected',x===b);});
+      top.src='static/images/tower_'+b.dataset.left+'.jpg'; wl.textContent=LABELS[b.dataset.left];
+    });
+  });
+
+  /* preference bars (Fig. 8) */
+  var PREF=[
+    ['Longer VR visit',75,17,8,'*** p<.001'],
+    ['Panoramic scenes',69,11,19,'** p=.004'],
+    ['Overall immersion',67,17,17,'** p=.004'],
+    ['Close-range scenes',53,25,22,'n.s. p=.052']
+  ];
+  var rows=document.getElementById('prefRows');
+  PREF.forEach(function(r){
+    var el=document.createElement('div'); el.className='pref-row';
+    el.innerHTML='<span class="lbl">'+r[0]+'</span><div class="pbar"><div class="d" data-w="'+r[1]+'" title="DomeGS '+r[1]+'%">'+r[1]+'%</div><div class="e" data-w="'+r[2]+'" title="Equal '+r[2]+'%">'+r[2]+'%</div><div class="s" data-w="'+r[3]+'" title="Skybox '+r[3]+'%">'+(r[3]>=10?r[3]+'%':'')+'</div></div><span class="sig">'+r[4]+'</span>';
+    rows.appendChild(el);
+  });
+  function growPref(){rows.querySelectorAll('.pbar div').forEach(function(d){d.style.width=d.dataset.w+'%';});}
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){if(es[0].isIntersecting){growPref(); io.disconnect();}},{threshold:.3});
+    io.observe(document.getElementById('prefPanel'));
+  } else growPref();
+
+  /* VLM scores (Table 4) */
+  var VLM={
+    Mean:{sky:[2.71,2.98,2.91],dome:[3.63,3.71,3.63],pref:0.672},
+    Tower:{sky:[3.22,3.38,3.31],dome:[4.00,4.10,3.71],pref:0.747},
+    Buddha:{sky:[2.36,2.90,2.79],dome:[3.43,3.58,3.58],pref:1.083},
+    Garden:{sky:[2.72,2.96,2.87],dome:[3.69,3.68,3.70],pref:0.475},
+    Bear:{sky:[2.54,2.69,2.67],dome:[3.38,3.46,3.52],pref:0.383}
+  };
+  var METRICS=['Boundary continuity','Lighting coherence','Perspective alignment'];
+  var vb=document.getElementById('vlmBars'), vt=document.getElementById('vlmTabs'), vp=document.getElementById('vlmPref');
+  METRICS.forEach(function(m,i){
+    var d=document.createElement('div'); d.className='metric';
+    d.innerHTML='<h4>'+m+'</h4>'+
+      '<div class="hb"><span>DomeGS</span><div class="track"><div class="fill" style="background:var(--dome)" id="vd'+i+'"></div></div><span class="num" id="vdn'+i+'"></span></div>'+
+      '<div class="hb"><span>Skybox</span><div class="track"><div class="fill" style="background:var(--sky)" id="vs'+i+'"></div></div><span class="num" id="vsn'+i+'"></span></div>';
+    vb.appendChild(d);
+  });
+  function showVLM(k){
+    var s=VLM[k];
+    for(var i=0;i<3;i++){
+      document.getElementById('vd'+i).style.width=(s.dome[i]/5*100)+'%'; document.getElementById('vdn'+i).textContent=s.dome[i].toFixed(2);
+      document.getElementById('vs'+i).style.width=(s.sky[i]/5*100)+'%'; document.getElementById('vsn'+i).textContent=s.sky[i].toFixed(2);
+    }
+    vp.textContent='Pairwise preference: +'+s.pref.toFixed(3)+' (scale −2…+2)';
+  }
+  Object.keys(VLM).forEach(function(k,i){
+    var b=document.createElement('button'); b.className='tab'; b.textContent=k==='Mean'?'All scenes':k;
+    b.setAttribute('aria-selected',i===0);
+    b.addEventListener('click',function(){vt.querySelectorAll('.tab').forEach(function(x){x.setAttribute('aria-selected',x===b);}); showVLM(k);});
+    vt.appendChild(b);
+  });
+  showVLM('Mean');
+
+  /* bibtex copy */
+  document.getElementById('copyBib').addEventListener('click',function(){
+    var btn=this, txt=document.getElementById('bibText').textContent;
+    (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(function(){btn.textContent='Copied!';},function(){
+      var r=document.createRange(); r.selectNodeContents(document.getElementById('bibText'));
+      var s=getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent='Press ⌘C';
+    }).finally(function(){setTimeout(function(){btn.textContent='Copy';},1800);});
+  });
+
+  /* lightbox */
+  var lb=document.getElementById('lb'), lbi=lb.querySelector('img');
+  document.querySelectorAll('[data-zoom]').forEach(function(img){
+    img.style.cursor='zoom-in';
+    img.addEventListener('click',function(){lbi.src=img.src; lbi.alt=img.alt; lb.classList.add('on');});
+  });
+  lb.addEventListener('click',function(){lb.classList.remove('on');});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape') lb.classList.remove('on');});
+})();
+</script>
+</body>
+</html>
